@@ -26,6 +26,13 @@ func init() {
 	listCommand.Flags().BoolP("categories", "c", false, "List all available categories")
 }
 
+func ClearScreen() {
+	for i := 0; i < 100; i++ {
+		fmt.Println(" ")
+	}
+	screen.Clear()
+}
+
 func list(cmd *cobra.Command, args []string) {
 	categories, _ := cmd.Flags().GetBool("categories")
 
@@ -33,6 +40,7 @@ func list(cmd *cobra.Command, args []string) {
 		sort.Slice(data.Categories, func(i, j int) bool {
 			return data.Categories[i].Name < data.Categories[j].Name
 		})
+		ClearScreen()
 		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit")
 		for _, v := range data.Categories {
 			if v.Name == "" {
@@ -51,7 +59,7 @@ func list(cmd *cobra.Command, args []string) {
 
 		// Provide its children
 		children := NewMenu((result.ID + " Packages: "))
-		screen.Clear()
+		ClearScreen()
 
 		c := result.Data.(store.Category)
 

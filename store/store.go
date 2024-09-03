@@ -23,8 +23,9 @@ type Entry struct {
 }
 
 type Category struct {
-	Name    string
-	Entries []Entry
+	Name        string
+	Description string
+	Entries     []Entry
 }
 
 type Store struct {
@@ -33,10 +34,12 @@ type Store struct {
 }
 
 func FetchAndParseMD() {
-	store := &Store{
-		Entries:    []Entry{},
-		Categories: []Category{},
-	}
+	/*
+		store := &Store{
+			Entries:    []Entry{},
+			Categories: []Category{},
+		}
+	*/
 
 	resp, err := http.Get("https://raw.githubusercontent.com/avelino/awesome-go/main/README.md")
 	if err != nil {
@@ -67,11 +70,23 @@ func FetchAndParseMD() {
 			if strings.Contains(line, "##") && !strings.Contains(line, "###") {
 				normalizedName := strings.Replace(line, "## ", "", 3)
 				c := &Category{
-					Name:    normalizedName,
-					Entries: []Entry{},
+					Name:        normalizedName,
+					Description: "",
+					Entries:     []Entry{},
 				}
-				fmt.Println(c, store)
-				break
+
+				// Try to see if the next line contains the category Description
+				// this is not always the case and will let us know if we skip it anyways.
+				if i+2 < len(sectionLines) {
+					nextLine := sectionLines[i+2]
+					if strings.Contains(nextLine, "._") {
+						// TODO: normalize this line "_<content>._"
+						c.Description = nextLine
+						fmt.Println(c)
+					}
+					i += 2
+					continue
+				}
 			}
 			i += 1
 		}

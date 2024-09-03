@@ -5,14 +5,30 @@
 package store
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 )
 
 func Init() {
-	FetchAndParseMD()
+	store := FetchAndParseMD()
+	if _, err := os.Stat("store.json"); errors.Is(err, os.ErrNotExist) {
+		jsonString, err := json.Marshal(store)
+		if err != nil {
+			panic(err)
+		}
+		os.WriteFile("store.json", jsonString, os.ModePerm)
+	}
+	// TODO: We need to add functionality to basically refresh this list.
+}
+
+func ReadFile(target *Store) {
+	file, _ := os.ReadFile("store.json")
+	json.Unmarshal(file, &target)
 }
 
 type Entry struct {
@@ -33,13 +49,11 @@ type Store struct {
 	Categories []Category
 }
 
-func FetchAndParseMD() {
-	/*
-		store := &Store{
-			Entries:    []Entry{},
-			Categories: []Category{},
-		}
-	*/
+func FetchAndParseMD() Store {
+	store := Store{
+		Entries:    []Entry{},
+		Categories: []Category{},
+	}
 
 	resp, err := http.Get("https://raw.githubusercontent.com/avelino/awesome-go/main/README.md")
 	if err != nil {
@@ -62,33 +76,81 @@ func FetchAndParseMD() {
 	for _, section := range sections {
 		sectionLines := strings.Split(section, "\n")
 
-		i := 0
-		for i < len(sectionLines) {
-			line := sectionLines[i]
-			// We have found the "Parent" node
-			// Its possible it has children with the ### item.
-			if strings.Contains(line, "##") && !strings.Contains(line, "###") {
-				normalizedName := strings.Replace(line, "## ", "", 3)
-				c := &Category{
-					Name:        normalizedName,
-					Description: "",
-					Entries:     []Entry{},
+		c := Category{
+			Name:        "",
+			Description: "",
+			Entries:     []Entry{},
+		}
+
+		j := 0
+		for j < len(sectionLines) {
+			line := sectionLines[j]
+
+			// Case 1 - We find a line that contains a Category (## or ###)
+			if strings.Contains(line, "##") {
+				// If we find a SuperClass, we skip it if it has children classes
+				search := j + 1
+				for sectionLines[search] == "" {
+					search += 1
 				}
 
-				// Try to see if the next line contains the category Description
-				// this is not always the case and will let us know if we skip it anyways.
-				if i+2 < len(sectionLines) {
-					nextLine := sectionLines[i+2]
-					if strings.Contains(nextLine, "._") {
-						// TODO: normalize this line "_<content>._"
-						c.Description = nextLine
-						fmt.Println(c)
-					}
-					i += 2
+				// If it has a children class we just want to skip this line.
+				if strings.Contains(sectionLines[search], "###") {
+					j += 1
+					continue
+				}
+
+				normalizedName := strings.Replace(line, "#", "", 3)
+				c.Name = normalizedName
+
+				// Otherwise we see if it has a Description
+				if strings.Contains(sectionLines[search], "._") {
+					c.Description = sectionLines[search]
+					j = search + 1
 					continue
 				}
 			}
-			i += 1
+
+			// Case 2 - The line is a link or package essentially
+			// format example:
+			// - [bingo](https://github.com/iancmcc/bingo) - Fast, zero-allocation, lexicographical-order-preserving packing of native types to bytes.
+			if strings.Contains(line, "(http") {
+				e := Entry{
+					Category:    c.Name,
+					Name:        "",
+					Link:        "",
+					Description: "",
+				}
+
+				title := match(line, "[", "]")
+				link := match(line, "(", ")")
+				e.Name = title
+				e.Link = link
+
+				// Attempt to find a description
+				entrySections := strings.Split(line, ") -")
+				if len(entrySections) > 1 {
+					e.Description = entrySections[1]
+				}
+
+				c.Entries = append(c.Entries, e)
+				store.Entries = append(store.Entries, e)
+			}
+			j += 1
+		}
+		store.Categories = append(store.Categories, c)
+	}
+
+	return store
+}
+
+func match(s string, openingBracket string, closingBracket string) string {
+	i := strings.Index(s, openingBracket)
+	if i >= 0 {
+		j := strings.Index(s, closingBracket)
+		if j >= 0 {
+			return s[i+1 : j]
 		}
 	}
+	return ""
 }

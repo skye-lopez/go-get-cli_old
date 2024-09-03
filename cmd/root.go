@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/skye-lopez/go-get-cli/store"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,8 @@ var rootCmd = &cobra.Command{
 	Long: `Search and install go packages! 
     Usage: `,
 }
+
+var data store.Store
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -33,4 +36,6 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	store.Init()
+	store.ReadFile(&data)
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/buger/goterm"
+	"github.com/inancgumus/screen"
 	"github.com/pkg/term"
 )
 
@@ -29,7 +30,6 @@ type Menu struct {
 	AllMenuItems []*MenuItem
 	StartIdx     int
 	EndIdx       int
-	Paginate     bool
 }
 
 type MenuItem struct {
@@ -38,14 +38,13 @@ type MenuItem struct {
 	Data any
 }
 
-func NewMenu(prompt string, paginate bool) *Menu {
+func NewMenu(prompt string) *Menu {
 	return &Menu{
 		Prompt:       prompt,
 		MenuItems:    make([]*MenuItem, 0),
 		AllMenuItems: make([]*MenuItem, 0),
 		StartIdx:     0,
-		EndIdx:       10,
-		Paginate:     paginate,
+		EndIdx:       20,
 	}
 }
 
@@ -57,14 +56,10 @@ func (m *Menu) AddItem(option string, id string, data any) *Menu {
 		Data: data,
 	}
 
-	if m.Paginate {
-		if len(m.MenuItems) < 10 {
-			m.MenuItems = append(m.MenuItems, menuItem)
-		}
-		m.AllMenuItems = append(m.AllMenuItems, menuItem)
-	} else {
+	if len(m.MenuItems) < 20 {
 		m.MenuItems = append(m.MenuItems, menuItem)
 	}
+	m.AllMenuItems = append(m.AllMenuItems, menuItem)
 	return m
 }
 
@@ -78,7 +73,9 @@ func (m *Menu) renderMenuItems(redraw bool) {
 		// This is done by sending a VT100 escape code to the terminal
 		// @see http://www.climagic.org/mirrors/VT100_Escape_Codes.html
 		fmt.Printf("\033[%dA", (len(m.MenuItems))-1)
+		screen.Clear()
 	}
+	fmt.Printf("\r %s\n", goterm.Color(goterm.Bold(m.Prompt)+":", goterm.CYAN))
 
 	for index, menuItem := range m.MenuItems {
 		newline := "\n"
@@ -107,8 +104,6 @@ func (m *Menu) Display() *MenuItem {
 		fmt.Printf("\033[?25h")
 	}()
 
-	fmt.Printf("%s\n", goterm.Color(goterm.Bold(m.Prompt)+":", goterm.CYAN))
-
 	m.renderMenuItems(false)
 
 	// Turn the terminal cursor off
@@ -129,11 +124,11 @@ func (m *Menu) Display() *MenuItem {
 			m.CursorPos = (m.CursorPos + 1) % len(m.MenuItems)
 			m.renderMenuItems(true)
 		} else if keyCode == next {
-			if m.Paginate {
+			if len(m.AllMenuItems) > 20 {
 
 				start := m.StartIdx
 				end := m.EndIdx
-				step := 10
+				step := 20
 
 				for end < len(m.AllMenuItems) && step > 0 {
 					end += 1
@@ -149,7 +144,7 @@ func (m *Menu) Display() *MenuItem {
 				m.renderMenuItems(true)
 			}
 		} else if keyCode == back {
-			if m.Paginate {
+			if len(m.AllMenuItems) > 20 {
 
 				start := m.StartIdx
 				end := m.EndIdx

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/inancgumus/screen"
 	"github.com/skye-lopez/go-get-cli/store"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +33,7 @@ func list(cmd *cobra.Command, args []string) {
 		sort.Slice(data.Categories, func(i, j int) bool {
 			return data.Categories[i].Name < data.Categories[j].Name
 		})
-		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit", true)
+		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit")
 		for _, v := range data.Categories {
 			if v.Name == "" {
 				continue
@@ -49,7 +50,8 @@ func list(cmd *cobra.Command, args []string) {
 		result := display.Display()
 
 		// Provide its children
-		children := NewMenu((result.ID + " Packages: "), false)
+		children := NewMenu((result.ID + " Packages: "))
+		screen.Clear()
 
 		c := result.Data.(store.Category)
 

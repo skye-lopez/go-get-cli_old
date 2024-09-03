@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/skye-lopez/go-get-cli/store"
 	"github.com/spf13/cobra"
 )
 
@@ -31,11 +32,12 @@ func list(cmd *cobra.Command, args []string) {
 		sort.Slice(data.Categories, func(i, j int) bool {
 			return data.Categories[i].Name < data.Categories[j].Name
 		})
-		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit")
+		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit", true)
 		for _, v := range data.Categories {
 			if v.Name == "" {
 				continue
 			}
+
 			displayName := v.Name
 			if v.Description != "" {
 				displayName += " (" + v.Description + ")                                                       "
@@ -43,7 +45,28 @@ func list(cmd *cobra.Command, args []string) {
 			display.AddItem(displayName, v.Name, v)
 		}
 
+		// Get the selected category
 		result := display.Display()
-		fmt.Println(result)
+
+		// Provide its children
+		children := NewMenu((result.ID + " Packages: "), false)
+
+		c := result.Data.(store.Category)
+
+		for _, v := range c.Entries {
+			if v.Name == "" {
+				continue
+			}
+
+			displayName := v.Name
+			if v.Description != "" {
+				displayName += " (" + v.Description + ")                                                       "
+			}
+			children.AddItem(displayName, v.Name, v)
+		}
+
+		selectedPackage := children.Display()
+
+		fmt.Println(selectedPackage)
 	}
 }

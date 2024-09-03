@@ -29,6 +29,7 @@ type Menu struct {
 	AllMenuItems []*MenuItem
 	StartIdx     int
 	EndIdx       int
+	Paginate     bool
 }
 
 type MenuItem struct {
@@ -37,13 +38,14 @@ type MenuItem struct {
 	Data any
 }
 
-func NewMenu(prompt string) *Menu {
+func NewMenu(prompt string, paginate bool) *Menu {
 	return &Menu{
 		Prompt:       prompt,
 		MenuItems:    make([]*MenuItem, 0),
 		AllMenuItems: make([]*MenuItem, 0),
 		StartIdx:     0,
 		EndIdx:       10,
+		Paginate:     paginate,
 	}
 }
 
@@ -55,31 +57,15 @@ func (m *Menu) AddItem(option string, id string, data any) *Menu {
 		Data: data,
 	}
 
-	if len(m.MenuItems) < 10 {
+	if m.Paginate {
+		if len(m.MenuItems) < 10 {
+			m.MenuItems = append(m.MenuItems, menuItem)
+		}
+		m.AllMenuItems = append(m.AllMenuItems, menuItem)
+	} else {
 		m.MenuItems = append(m.MenuItems, menuItem)
 	}
-	m.AllMenuItems = append(m.AllMenuItems, menuItem)
 	return m
-}
-
-func (m *Menu) AddNavigationOptions() {
-	for _, v := range m.MenuItems {
-		if v.ID == "next" {
-			return
-		}
-	}
-
-	nextItem := &MenuItem{
-		Text: "next page",
-		ID:   "next",
-	}
-
-	backItem := &MenuItem{
-		Text: "last page",
-		ID:   "back",
-	}
-	m.MenuItems = append(m.MenuItems, nextItem)
-	m.MenuItems = append(m.MenuItems, backItem)
 }
 
 // renderMenuItems prints the menu item list.
@@ -109,13 +95,13 @@ func (m *Menu) renderMenuItems(redraw bool) {
 			menuItemText = goterm.Color(menuItemText, goterm.YELLOW)
 		}
 
-		fmt.Printf("\r%s %s%s", cursor, menuItemText, newline)
+		fmt.Printf("\r %s %s%s", cursor, menuItemText, newline)
 	}
 }
 
 // Display will display the current menu options and awaits user selection
 // It returns the users selected choice
-func (m *Menu) Display() string {
+func (m *Menu) Display() *MenuItem {
 	defer func() {
 		// Show cursor again.
 		fmt.Printf("\033[?25h")
@@ -131,11 +117,11 @@ func (m *Menu) Display() string {
 	for {
 		keyCode := getInput()
 		if keyCode == escape {
-			return ""
+			return &MenuItem{}
 		} else if keyCode == enter {
 			menuItem := m.MenuItems[m.CursorPos]
 			fmt.Println("\r")
-			return menuItem.ID
+			return menuItem
 		} else if keyCode == up {
 			m.CursorPos = (m.CursorPos + len(m.MenuItems) - 1) % len(m.MenuItems)
 			m.renderMenuItems(true)
@@ -143,38 +129,44 @@ func (m *Menu) Display() string {
 			m.CursorPos = (m.CursorPos + 1) % len(m.MenuItems)
 			m.renderMenuItems(true)
 		} else if keyCode == next {
-			start := m.StartIdx
-			end := m.EndIdx
-			step := 10
+			if m.Paginate {
 
-			for end < len(m.AllMenuItems) && step > 0 {
-				end += 1
-				start += 1
-				step -= 1
+				start := m.StartIdx
+				end := m.EndIdx
+				step := 10
+
+				for end < len(m.AllMenuItems) && step > 0 {
+					end += 1
+					start += 1
+					step -= 1
+				}
+
+				m.StartIdx = start
+				m.EndIdx = end
+
+				m.MenuItems = m.AllMenuItems[m.StartIdx:m.EndIdx]
+				m.CursorPos = 0
+				m.renderMenuItems(true)
 			}
-
-			m.StartIdx = start
-			m.EndIdx = end
-
-			m.MenuItems = m.AllMenuItems[m.StartIdx:m.EndIdx]
-			m.CursorPos = 0
-			m.renderMenuItems(true)
 		} else if keyCode == back {
-			start := m.StartIdx
-			end := m.EndIdx
-			step := 10
+			if m.Paginate {
 
-			for start > 0 && step > 0 {
-				end -= 1
-				start -= 1
-				step -= 1
+				start := m.StartIdx
+				end := m.EndIdx
+				step := 10
+
+				for start > 0 && step > 0 {
+					end -= 1
+					start -= 1
+					step -= 1
+				}
+
+				m.StartIdx = start
+				m.EndIdx = end
+				m.MenuItems = m.AllMenuItems[m.StartIdx:m.EndIdx]
+				m.CursorPos = 0
+				m.renderMenuItems(true)
 			}
-
-			m.StartIdx = start
-			m.EndIdx = end
-			m.MenuItems = m.AllMenuItems[m.StartIdx:m.EndIdx]
-			m.CursorPos = 0
-			m.renderMenuItems(true)
 		}
 	}
 }

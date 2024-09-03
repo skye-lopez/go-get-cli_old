@@ -15,15 +15,15 @@ import (
 )
 
 func Init() {
-	store := FetchAndParseMD()
+	// TODO: We need to add functionality to basically refresh this list.
 	if _, err := os.Stat("store.json"); errors.Is(err, os.ErrNotExist) {
+		store := FetchAndParseMD()
 		jsonString, err := json.Marshal(store)
 		if err != nil {
 			panic(err)
 		}
 		os.WriteFile("store.json", jsonString, os.ModePerm)
 	}
-	// TODO: We need to add functionality to basically refresh this list.
 }
 
 func ReadFile(target *Store) {

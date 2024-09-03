@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"sort"
 
-	"github.com/inancgumus/screen"
-	"github.com/skye-lopez/go-get-cli/store"
+	"github.com/skye-lopez/go-get-cli/interaction"
 	"github.com/spf13/cobra"
 )
 
@@ -26,13 +24,6 @@ func init() {
 	listCommand.Flags().BoolP("categories", "c", false, "List all available categories")
 }
 
-func ClearScreen() {
-	for i := 0; i < 100; i++ {
-		fmt.Println(" ")
-	}
-	screen.Clear()
-}
-
 func list(cmd *cobra.Command, args []string) {
 	categories, _ := cmd.Flags().GetBool("categories")
 
@@ -40,43 +31,18 @@ func list(cmd *cobra.Command, args []string) {
 		sort.Slice(data.Categories, func(i, j int) bool {
 			return data.Categories[i].Name < data.Categories[j].Name
 		})
-		ClearScreen()
-		display := NewMenu("Available categories - [N] Next Page | [B] Last Page | [ENTER] Select | [ESC] Exit")
+
+		i := interaction.NewInteraction()
+		homePrompt := i.CreatePrompt("Available packages by category:", "[n] Next | [b] Last | [esc] Exit | [enter] Select", true)
+
 		for _, v := range data.Categories {
+			// TODO: Some are empty fsr...
 			if v.Name == "" {
 				continue
 			}
-
-			displayName := v.Name
-			if v.Description != "" {
-				displayName += " (" + v.Description + ")                                                       "
-			}
-			display.AddItem(displayName, v.Name, v)
+			homePrompt.AddOption(v.Name, v.Description, v)
 		}
 
-		// Get the selected category
-		result := display.Display()
-
-		// Provide its children
-		children := NewMenu((result.ID + " Packages: "))
-		ClearScreen()
-
-		c := result.Data.(store.Category)
-
-		for _, v := range c.Entries {
-			if v.Name == "" {
-				continue
-			}
-
-			displayName := v.Name
-			if v.Description != "" {
-				displayName += " (" + v.Description + ")                                                       "
-			}
-			children.AddItem(displayName, v.Name, v)
-		}
-
-		selectedPackage := children.Display()
-
-		fmt.Println(selectedPackage)
+		i.Open()
 	}
 }

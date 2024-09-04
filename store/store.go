@@ -105,7 +105,10 @@ func FetchAndParseMD() Store {
 
 				// Otherwise we see if it has a Description
 				if strings.Contains(sectionLines[search], "._") {
-					c.Description = sectionLines[search]
+
+					normalizeDescription := strings.TrimLeft(sectionLines[search], "_")
+					normalizeDescription = strings.TrimRight(normalizeDescription, "._")
+					c.Description = normalizeDescription
 					j = search + 1
 					continue
 				}

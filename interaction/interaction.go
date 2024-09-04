@@ -161,8 +161,8 @@ func (i *Interaction) Open() *Option {
 
 			// Otherwise handle the option
 			if selectedOption.Callback != nil {
-				message, _ := selectedOption.Callback()
-				fmt.Println("\n\n\n", message)
+				message, err := selectedOption.Callback()
+				fmt.Println("\n\n\n", message, "\n\n\n", err)
 			}
 		case u: // naviagte up
 			if p.ParentIdx >= 0 {
@@ -215,7 +215,7 @@ func (i *Interaction) Render() {
 				goterm.Bold(" ("+v.Description+") "+linePadding),
 				nl)
 		case false:
-			fmt.Printf("\r%s%s%s%s", "  ", v.Title, v.Description+linePadding, "\n")
+			fmt.Printf("\r%s%s%s%s", "  ", v.Title, " ("+v.Description+") "+linePadding, "\n")
 		}
 		i.LinesOnLastRender += 1
 	}

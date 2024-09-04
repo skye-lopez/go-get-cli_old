@@ -11,6 +11,7 @@ import (
 type Interaction struct {
 	Prompts           map[int]*Prompt
 	CurrentIdx        int
+	NextInsertIdx     int
 	CursorIdx         int
 	LinesOnLastRender int
 }
@@ -35,18 +36,19 @@ func NewInteraction() *Interaction {
 	return &Interaction{
 		Prompts:           make(map[int]*Prompt, 0),
 		CurrentIdx:        0,
+		NextInsertIdx:     0,
 		CursorIdx:         0,
 		LinesOnLastRender: 0,
 	}
 }
 
 func (i *Interaction) CreatePrompt(title string, description string, isPaginated bool) *Prompt {
-	i.CurrentIdx += 1
+	i.NextInsertIdx += 1
 	p := &Prompt{
 		Title:       title,
 		Description: description,
 		Options:     make([][]*Option, 0),
-		Idx:         i.CurrentIdx,
+		Idx:         i.NextInsertIdx,
 		PageIdx:     0,
 		IsPaginated: isPaginated,
 	}
@@ -54,7 +56,13 @@ func (i *Interaction) CreatePrompt(title string, description string, isPaginated
 	firstPage := []*Option{}
 	p.Options = append(p.Options, firstPage)
 
-	i.Prompts[i.CurrentIdx] = p
+	// check if we are making the first prompt
+	_, ok := i.Prompts[0]
+	if !ok {
+		i.Prompts[0] = p
+	} else {
+		i.Prompts[i.NextInsertIdx] = p
+	}
 	return p
 }
 
@@ -91,7 +99,7 @@ func (o *Option) AttachPrompt(promptIdx int) {
 	o.PromptIdx = promptIdx
 }
 
-func (i *Interaction) Open() {
+func (i *Interaction) Open() *Option {
 	// Hide cursor and return it on close
 	defer func() {
 		fmt.Printf("\033[?25h")
@@ -107,7 +115,7 @@ func (i *Interaction) Open() {
 
 		switch key {
 		case escape:
-			return
+			return &Option{}
 		case n:
 			if p.PageIdx+1 < len(p.Options) {
 				p.PageIdx += 1
@@ -130,25 +138,35 @@ func (i *Interaction) Open() {
 				i.CursorIdx += 1
 				i.Render()
 			}
+		case enter:
+			cprompt := i.Prompts[i.CurrentIdx]
+			cpromptOptions := cprompt.Options[cprompt.PageIdx]
+			selectedOption := cpromptOptions[i.CursorIdx]
+
+			if selectedOption.PromptIdx > 0 {
+				i.CurrentIdx = selectedOption.PromptIdx
+				i.CursorIdx = 0
+				i.Prompts[i.CurrentIdx].PageIdx = 0
+				i.Render()
+			}
 		}
 	}
 }
 
+// This makes our UI really easy to work with but im not a huge fan of clearing any past context...
 func (i *Interaction) HardFlushScreen() {
-	for i := 0; i < 100; i++ {
-		fmt.Println("")
-	}
 	screen.Clear()
+	screen.MoveTopLeft()
 }
 
 // Render is called on any user input action and by default repaints the current Prompt
 func (i *Interaction) Render() {
+	// For now we are just going to hard clear. can come back to this later.
+	i.HardFlushScreen()
 	p := i.Prompts[i.CurrentIdx]
 	// Redraw
 	// This *MOSTLY* works but Im sure will need to be changed a bit.
 	if i.LinesOnLastRender > 1 {
-		// For now we are just going to hard clear. can come back to this later.
-		i.HardFlushScreen()
 		fmt.Printf("\033[%dA", i.LinesOnLastRender)
 	}
 	i.LinesOnLastRender = 0

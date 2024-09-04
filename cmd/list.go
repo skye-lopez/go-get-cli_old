@@ -40,7 +40,16 @@ func list(cmd *cobra.Command, args []string) {
 			if v.Name == "" {
 				continue
 			}
-			homePrompt.AddOption(v.Name, v.Description, v)
+			option := homePrompt.AddOption(v.Name, v.Description, v)
+			categoryPrompt := i.CreatePrompt(v.Name+" - Packages ("+v.Description+") ", "[n] Next | [b] Last | [esc] Exit | [enter] Select", true)
+			option.AttachPrompt(categoryPrompt.Idx)
+
+			for _, ov := range v.Entries {
+				if ov.Name == "" {
+					continue
+				}
+				categoryPrompt.AddOption(ov.Name, ov.Description, ov)
+			}
 		}
 
 		i.Open()

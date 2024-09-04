@@ -22,15 +22,16 @@ type Prompt struct {
 	Options     [][]*Option
 	Idx         int
 	PageIdx     int
+	ParentIdx   int
 	IsPaginated bool
 }
 
 type Option struct {
+	Callback    func(...any) (string, error)
 	Packet      any
 	Title       string
 	Description string
 	PromptIdx   int
-	Callback    func(...any)
 }
 
 func NewInteraction() *Interaction {
@@ -44,7 +45,6 @@ func NewInteraction() *Interaction {
 }
 
 func (i *Interaction) CreatePrompt(title string, description string, isPaginated bool) *Prompt {
-	i.NextInsertIdx += 1
 	p := &Prompt{
 		Title:       title,
 		Description: description,
@@ -56,14 +56,9 @@ func (i *Interaction) CreatePrompt(title string, description string, isPaginated
 
 	firstPage := []*Option{}
 	p.Options = append(p.Options, firstPage)
+	i.Prompts[p.Idx] = p
+	i.NextInsertIdx += 1
 
-	// check if we are making the first prompt
-	_, ok := i.Prompts[0]
-	if !ok {
-		i.Prompts[0] = p
-	} else {
-		i.Prompts[i.NextInsertIdx] = p
-	}
 	return p
 }
 
@@ -96,12 +91,20 @@ func (p *Prompt) AddOption(title string, description string, packet any) *Option
 	return o
 }
 
+func (p *Prompt) AttachParent(parentIdx int) {
+	p.ParentIdx = parentIdx
+}
+
 func (o *Option) AttachPrompt(promptIdx int) {
 	o.PromptIdx = promptIdx
 }
 
-func (o *Option) AddCallback(cb func(...any)) {
+func (o *Option) AddCallback(cb func(...any) (string, error)) {
 	o.Callback = cb
+}
+
+func (i *Interaction) getCurrentPrompt() *Prompt {
+	return i.Prompts[i.CurrentIdx]
 }
 
 func (i *Interaction) Open() *Option {
@@ -113,9 +116,9 @@ func (i *Interaction) Open() *Option {
 
 	// Render initial state
 	i.Render()
-	p := i.Prompts[i.CurrentIdx]
-	pLen := len(p.Options[p.PageIdx])
 	for {
+		p := i.getCurrentPrompt()
+		pLen := len(p.Options[p.PageIdx])
 		key := userInput()
 
 		switch key {
@@ -158,7 +161,16 @@ func (i *Interaction) Open() *Option {
 
 			// Otherwise handle the option
 			if selectedOption.Callback != nil {
-				selectedOption.Callback()
+				message, _ := selectedOption.Callback()
+				fmt.Println("\n\n\n", message)
+			}
+		case u: // naviagte up
+			if p.ParentIdx >= 0 {
+				fmt.Println("Navigate up idx:", p.ParentIdx)
+				i.CurrentIdx = p.ParentIdx
+				i.CursorIdx = 0
+				i.Prompts[i.CurrentIdx].PageIdx = 0
+				i.Render()
 			}
 		}
 	}
@@ -174,7 +186,7 @@ func (i *Interaction) HardFlushScreen() {
 func (i *Interaction) Render() {
 	// For now we are just going to hard clear. can come back to this later.
 	i.HardFlushScreen()
-	p := i.Prompts[i.CurrentIdx]
+	p := i.getCurrentPrompt()
 	// Redraw
 	// This *MOSTLY* works but Im sure will need to be changed a bit.
 	if i.LinesOnLastRender > 1 {
@@ -211,6 +223,7 @@ func (i *Interaction) Render() {
 
 // Raw input keycodes
 var (
+	u      byte = 117
 	up     byte = 65
 	down   byte = 66
 	escape byte = 27

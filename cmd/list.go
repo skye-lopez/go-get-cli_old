@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os/exec"
 	"sort"
 	"strings"
@@ -36,6 +37,7 @@ func list(cmd *cobra.Command, args []string) {
 
 		i := interaction.NewInteraction()
 		homePrompt := i.CreatePrompt("Available packages by category:", "[n] Next | [b] Last | [esc] Exit | [enter] Select", true)
+		fmt.Println(homePrompt.Idx)
 
 		for _, v := range data.Categories {
 			// TODO: Some are empty fsr...
@@ -43,7 +45,10 @@ func list(cmd *cobra.Command, args []string) {
 				continue
 			}
 			option := homePrompt.AddOption(v.Name, v.Description, v)
+
 			categoryPrompt := i.CreatePrompt(v.Name+" - Packages ("+v.Description+") ", "[n] Next | [b] Last | [esc] Exit | [enter] Select", true)
+			categoryPrompt.AttachParent(homePrompt.Idx)
+
 			option.AttachPrompt(categoryPrompt.Idx)
 
 			for _, ov := range v.Entries {
@@ -51,12 +56,15 @@ func list(cmd *cobra.Command, args []string) {
 					continue
 				}
 				catOption := categoryPrompt.AddOption(ov.Name, ov.Description, ov)
+
 				entryPrompt := i.CreatePrompt(ov.Name, ov.Description, false)
+				entryPrompt.AttachParent(categoryPrompt.Idx)
+
 				catOption.AttachPrompt(entryPrompt.Idx)
 
 				installOption := entryPrompt.AddOption("Install via go get", "go get "+ov.Link, ov)
 
-				installFunc := func(...any) {
+				installFunc := func(...any) (string, error) {
 					goPath, err := exec.LookPath("go")
 					// This likely means the user does not have a go PATH set to $PATH
 					if err != nil {
@@ -74,8 +82,9 @@ func list(cmd *cobra.Command, args []string) {
 					install := exec.Command(goPath, "get", installCandidate)
 					err = install.Run()
 					if err != nil {
-						panic(err)
+						return "Error installing the selected package.", err
 					}
+					return "Package installed! Have fun :)", nil
 				}
 				installOption.AddCallback(installFunc)
 			}

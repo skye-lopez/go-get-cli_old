@@ -45,10 +45,14 @@ func list(cmd *cobra.Command, args []string) {
 			option.AttachPrompt(categoryPrompt.Idx)
 
 			for _, ov := range v.Entries {
-				if ov.Name == "" {
+				if len(ov.Name) < 2 {
 					continue
 				}
-				categoryPrompt.AddOption(ov.Name, ov.Description, ov)
+				catOption := categoryPrompt.AddOption(ov.Name, ov.Description, ov)
+				entryPrompt := i.CreatePrompt(ov.Name, ov.Description, false)
+				catOption.AttachPrompt(entryPrompt.Idx)
+
+				entryPrompt.AddOption("Download link/Documentation", ov.Link, ov.Link)
 			}
 		}
 

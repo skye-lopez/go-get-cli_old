@@ -30,6 +30,7 @@ type Option struct {
 	Title       string
 	Description string
 	PromptIdx   int
+	Callback    func(...any)
 }
 
 func NewInteraction() *Interaction {
@@ -99,6 +100,10 @@ func (o *Option) AttachPrompt(promptIdx int) {
 	o.PromptIdx = promptIdx
 }
 
+func (o *Option) AddCallback(cb func(...any)) {
+	o.Callback = cb
+}
+
 func (i *Interaction) Open() *Option {
 	// Hide cursor and return it on close
 	defer func() {
@@ -143,11 +148,17 @@ func (i *Interaction) Open() *Option {
 			cpromptOptions := cprompt.Options[cprompt.PageIdx]
 			selectedOption := cpromptOptions[i.CursorIdx]
 
+			// If the option has children render that
 			if selectedOption.PromptIdx > 0 {
 				i.CurrentIdx = selectedOption.PromptIdx
 				i.CursorIdx = 0
 				i.Prompts[i.CurrentIdx].PageIdx = 0
 				i.Render()
+			}
+
+			// Otherwise handle the option
+			if selectedOption.Callback != nil {
+				selectedOption.Callback()
 			}
 		}
 	}

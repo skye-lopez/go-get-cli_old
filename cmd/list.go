@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"os/exec"
 	"sort"
+	"strings"
 
 	"github.com/skye-lopez/go-get-cli/interaction"
 	"github.com/spf13/cobra"
@@ -52,7 +54,30 @@ func list(cmd *cobra.Command, args []string) {
 				entryPrompt := i.CreatePrompt(ov.Name, ov.Description, false)
 				catOption.AttachPrompt(entryPrompt.Idx)
 
-				entryPrompt.AddOption("Download link/Documentation", ov.Link, ov.Link)
+				installOption := entryPrompt.AddOption("Install via go get", "go get "+ov.Link, ov)
+
+				installFunc := func(...any) {
+					goPath, err := exec.LookPath("go")
+					// This likely means the user does not have a go PATH set to $PATH
+					if err != nil {
+						panic(err)
+					}
+
+					// Format link for install
+					// /usr/local/go/bin/go go get  https://github.com/guptarohit/asciigraph
+					var installCandidate string
+
+					if strings.Contains(ov.Link, "https://") {
+						installCandidate = strings.Split(ov.Link, "https://")[1]
+					}
+
+					install := exec.Command(goPath, "get", installCandidate)
+					err = install.Run()
+					if err != nil {
+						panic(err)
+					}
+				}
+				installOption.AddCallback(installFunc)
 			}
 		}
 

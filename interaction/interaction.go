@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/buger/goterm"
+	"github.com/inancgumus/screen"
 	"github.com/pkg/term"
 )
 
@@ -27,6 +28,7 @@ type Option struct {
 	Packet      any
 	Title       string
 	Description string
+	PromptIdx   int
 }
 
 func NewInteraction() *Interaction {
@@ -56,11 +58,17 @@ func (i *Interaction) CreatePrompt(title string, description string, isPaginated
 	return p
 }
 
-func (p *Prompt) AddOption(title string, description string, packet any) {
+func (p *Prompt) AddOption(title string, description string, packet any) *Option {
 	o := &Option{
 		Title:       title,
 		Description: description,
 		Packet:      packet,
+	}
+
+	// Skip paginating
+	if !p.IsPaginated {
+		p.Options[0] = append(p.Options[0], o)
+		return o
 	}
 
 	// Get idx of the last page
@@ -69,18 +77,31 @@ func (p *Prompt) AddOption(title string, description string, packet any) {
 	// Fill to 10
 	if len(p.Options[lastPage]) < 10 {
 		p.Options[lastPage] = append(p.Options[lastPage], o)
-		return
+		return o
 	}
 
 	// Create new page if already at 10
 	newPage := []*Option{o}
 	p.Options = append(p.Options, newPage)
+
+	return o
+}
+
+func (o *Option) AttachPrompt(promptIdx int) {
+	o.PromptIdx = promptIdx
 }
 
 func (i *Interaction) Open() {
+	// Hide cursor and return it on close
+	defer func() {
+		fmt.Printf("\033[?25h")
+	}()
+	fmt.Printf("\033[?25l")
+
 	// Render initial state
 	i.Render()
 	p := i.Prompts[i.CurrentIdx]
+	pLen := len(p.Options[p.PageIdx])
 	for {
 		key := userInput()
 
@@ -90,15 +111,34 @@ func (i *Interaction) Open() {
 		case n:
 			if p.PageIdx+1 < len(p.Options) {
 				p.PageIdx += 1
+				i.CursorIdx = 0
 				i.Render()
 			}
 		case b:
 			if p.PageIdx-1 >= 0 {
 				p.PageIdx -= 1
+				i.CursorIdx = 0
+				i.Render()
+			}
+		case up:
+			if i.CursorIdx-1 >= 0 {
+				i.CursorIdx -= 1
+				i.Render()
+			}
+		case down:
+			if i.CursorIdx+1 < pLen {
+				i.CursorIdx += 1
 				i.Render()
 			}
 		}
 	}
+}
+
+func (i *Interaction) HardFlushScreen() {
+	for i := 0; i < 100; i++ {
+		fmt.Println("")
+	}
+	screen.Clear()
 }
 
 // Render is called on any user input action and by default repaints the current Prompt
@@ -107,6 +147,8 @@ func (i *Interaction) Render() {
 	// Redraw
 	// This *MOSTLY* works but Im sure will need to be changed a bit.
 	if i.LinesOnLastRender > 1 {
+		// For now we are just going to hard clear. can come back to this later.
+		i.HardFlushScreen()
 		fmt.Printf("\033[%dA", i.LinesOnLastRender)
 	}
 	i.LinesOnLastRender = 0
@@ -115,25 +157,26 @@ func (i *Interaction) Render() {
 	fmt.Printf("\r%s\n%s\n", goterm.Color(goterm.Bold(p.Title), goterm.CYAN), goterm.Color(p.Description, goterm.MAGENTA))
 	i.LinesOnLastRender += 2
 
-	// Draw prompts options
 	optionsToRender := p.Options[p.PageIdx]
 	// Because we are repainting, we need to ensure it gets cleared fully.
-	linePadding := "                                            "
+	linePadding := "                                                                               "
+	nl := "\n"
 
-	iters := 0
-	for _, v := range optionsToRender {
-		fmt.Printf("\r%s%s", v.Title+linePadding, "\n")
-		i.LinesOnLastRender += 1
-		iters += 1
-	}
-
-	// For paginated prompts we want to ensure they are drawn properly.
-	if p.IsPaginated {
-		for iters < 10 {
-			fmt.Printf("\r%s%s", linePadding+linePadding, "\n")
-			iters += 1
-			i.LinesOnLastRender += 1
+	for j, v := range optionsToRender {
+		if j == len(optionsToRender)-1 {
+			nl = ""
 		}
+		switch j == i.CursorIdx {
+		case true:
+			fmt.Printf("\r%s%s%s%s",
+				goterm.Color(goterm.Bold(">  "), goterm.YELLOW),
+				goterm.Color(goterm.Bold(v.Title), goterm.YELLOW),
+				goterm.Bold(" ("+v.Description+") "+linePadding),
+				nl)
+		case false:
+			fmt.Printf("\r%s%s%s%s", "  ", v.Title, v.Description+linePadding, "\n")
+		}
+		i.LinesOnLastRender += 1
 	}
 }
 

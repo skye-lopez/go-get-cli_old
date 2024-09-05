@@ -228,6 +228,8 @@ var (
 	enter  byte = 13
 	n      byte = 110
 	b      byte = 98
+	search byte = 43
+	r      byte = 114
 )
 
 func userInput() byte {

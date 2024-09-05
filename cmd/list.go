@@ -43,9 +43,6 @@ func list(cmd *cobra.Command, args []string) {
 	sort.Slice(data.Categories, func(i, j int) bool {
 		return data.Categories[i].Name < data.Categories[j].Name
 	})
-	sort.Slice(data.Entries, func(i, j int) bool {
-		return data.Entries[i].Name < data.Categories[j].Name
-	})
 
 	if all && categories {
 		fmt.Println("You can not stack -a and -c, please choose one.")

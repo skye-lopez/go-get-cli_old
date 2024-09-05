@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os/exec"
 	"sort"
 	"strings"
@@ -37,11 +38,20 @@ func init() {
 func list(cmd *cobra.Command, args []string) {
 	categories, _ := cmd.Flags().GetBool("categories")
 	all, _ := cmd.Flags().GetBool("all")
+
+	// TODO: Pre-sort in the store when generating file.
 	sort.Slice(data.Categories, func(i, j int) bool {
 		return data.Categories[i].Name < data.Categories[j].Name
 	})
+	sort.Slice(data.Entries, func(i, j int) bool {
+		return data.Entries[i].Name < data.Categories[j].Name
+	})
 
-	if all && !categories {
+	if all && categories {
+		fmt.Println("You can not stack -a and -c, please choose one.")
+	}
+
+	if all {
 		i := interaction.NewInteraction()
 		homePrompt := i.CreatePrompt("All packages (sorted by name)", "[n] Next Page | [b] Last Page | [esc] Exit | [enter] Select", true)
 
@@ -85,7 +95,7 @@ func list(cmd *cobra.Command, args []string) {
 		i.Open()
 	}
 
-	if categories && !all {
+	if categories {
 		i := interaction.NewInteraction()
 		homePrompt := i.CreatePrompt("Available packages by category:", "[n] Next page | [b] Last page | [esc] Exit | [enter] Select", true)
 

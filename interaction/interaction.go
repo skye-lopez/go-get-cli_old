@@ -147,16 +147,11 @@ func (i *Interaction) Open() *Option {
 				i.Render()
 			}
 		case enter:
-			cprompt := i.Prompts[i.CurrentIdx]
-			cpromptOptions := cprompt.Options[cprompt.PageIdx]
-			selectedOption := cpromptOptions[i.CursorIdx]
+			selectedOption := p.Options[p.PageIdx][i.CurrentIdx]
 
 			// If the option has children render that
 			if selectedOption.PromptIdx > 0 {
-				i.CurrentIdx = selectedOption.PromptIdx
-				i.CursorIdx = 0
-				i.Prompts[i.CurrentIdx].PageIdx = 0
-				i.Render()
+				i.RenderNewPrompt(selectedOption.PromptIdx)
 			}
 
 			// Otherwise handle the option
@@ -166,14 +161,17 @@ func (i *Interaction) Open() *Option {
 			}
 		case u: // naviagte up
 			if p.ParentIdx >= 0 {
-				fmt.Println("Navigate up idx:", p.ParentIdx)
-				i.CurrentIdx = p.ParentIdx
-				i.CursorIdx = 0
-				i.Prompts[i.CurrentIdx].PageIdx = 0
-				i.Render()
+				i.RenderNewPrompt(p.ParentIdx)
 			}
 		}
 	}
+}
+
+func (i *Interaction) RenderNewPrompt(newIdx int) {
+	i.CurrentIdx = newIdx
+	i.CursorIdx = 0
+	i.Prompts[i.CurrentIdx].PageIdx = 0
+	i.Render()
 }
 
 // This makes our UI really easy to work with but im not a huge fan of clearing any past context...

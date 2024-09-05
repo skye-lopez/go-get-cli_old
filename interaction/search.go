@@ -11,13 +11,14 @@ import (
 )
 
 type SearchInteraction struct {
-	Prompts        map[int]*Prompt // Pointer to prompts to render upon selection a package option.
-	Trie           map[string][]*Option
+	Prompts        map[int]*Prompt     // Pointer to prompts to render upon selection a package option.
+	StoredOptions  map[int][][]*Option // This is a temp reference to the non-searched options after they have been paginated.
+	Trie           map[string][][]*Option
 	SearchInput    string // Text to filter
 	CurrentIdx     int
 	CursorIdx      int
-	SearchSelected bool
 	NextInsertIdx  int
+	SearchSelected bool
 }
 
 func NewSearchInteraction() *SearchInteraction {
@@ -28,8 +29,13 @@ func NewSearchInteraction() *SearchInteraction {
 		CursorIdx:      0,
 		NextInsertIdx:  0,
 		CurrentIdx:     0,
-		Trie:           make(map[string][]*Option, 0),
+		Trie:           make(map[string][][]*Option, 0),
+		StoredOptions:  make(map[int][][]*Option),
 	}
+}
+
+func (s *SearchInteraction) StoreOptionsFromPrompt(p *Prompt) {
+	s.StoredOptions[p.Idx] = p.Options
 }
 
 func (s *SearchInteraction) CreatePrompt(title string, description string, isPaginated bool) *Prompt {
@@ -50,27 +56,66 @@ func (s *SearchInteraction) CreatePrompt(title string, description string, isPag
 	return p
 }
 
-// On New insert of option build out Trie
 func (s *SearchInteraction) UpdateTrie(o *Option) {
-	insertTerm := ""
+	terms := make([]string, 0)
+	runningTerm := ""
 	for _, char := range o.Title {
 		c := string(char)
-		insertTerm += c
+		runningTerm += c
+		terms = append(terms, runningTerm)
+	}
 
-		_, exists := s.Trie[insertTerm]
+	for _, term := range terms {
+		_, exists := s.Trie[term]
+
+		// Init new section if needed
 		if !exists {
-			s.Trie[insertTerm] = make([]*Option, 0)
-		} else {
-			// check if we already appended this - maybe a map would be better here since this is O(n) every time...
-			for _, v := range s.Trie[insertTerm] {
-				if v == o {
-					return
-				}
-			}
-			s.Trie[insertTerm] = append(s.Trie[insertTerm], o)
+			newState := [][]*Option{{o}}
+			s.Trie[term] = newState
+			continue
 		}
 
+		// Check if this option is already stored in the term (no duplicates)
+		skip := false
+		for _, page := range s.Trie[term] {
+			for _, v := range page {
+				// if we find the current value we dont want to do anything.
+				if v == o {
+					skip = true
+				}
+			}
+		}
+
+		if skip {
+			continue
+		}
+
+		lastPageIdx := len(s.Trie[term]) - 1
+		if len(s.Trie[term][lastPageIdx]) < 10 {
+			s.Trie[term][lastPageIdx] = append(s.Trie[term][lastPageIdx], o)
+		} else {
+			newPage := []*Option{o}
+			s.Trie[term] = append(s.Trie[term], newPage)
+		}
 	}
+}
+
+func (s *SearchInteraction) UpdateOnSearch() {
+	if s.SearchInput == "" {
+		s.Prompts[0].Options = s.StoredOptions[0]
+		return
+	}
+
+	_, avail := s.Trie[s.SearchInput]
+	if !avail {
+		emptyOption := &Option{
+			Title:       "No Search results!",
+			Description: "Try another search term",
+		}
+		s.Prompts[0].Options = [][]*Option{{emptyOption}}
+		return
+	}
+	s.Prompts[0].Options = s.Trie[s.SearchInput]
 }
 
 func (s *SearchInteraction) Open() {
@@ -89,11 +134,23 @@ func (s *SearchInteraction) Open() {
 			switch key {
 			case escape:
 				return
-			case r:
+			case results:
 				s.SearchSelected = false
 				s.Render()
+			case backspace:
+				if len(s.SearchInput) > 0 {
+					s.SearchInput = s.SearchInput[:len(s.SearchInput)-1]
+				}
+				s.UpdateOnSearch()
+				s.Render()
+			default:
+				str := string(key)
+				if str != " " {
+					s.SearchInput += str
+					s.UpdateOnSearch()
+					s.Render()
+				}
 			}
-			fmt.Println("\n\n\n\n\n\n", key)
 		case false:
 			switch key {
 			case escape:
@@ -124,7 +181,7 @@ func (s *SearchInteraction) Open() {
 					s.Render()
 				}
 			case enter:
-				selectedOption := p.Options[p.PageIdx][s.CurrentIdx]
+				selectedOption := p.Options[p.PageIdx][s.CursorIdx]
 
 				// If the option has children render that
 				if selectedOption.PromptIdx > 0 {
@@ -133,6 +190,7 @@ func (s *SearchInteraction) Open() {
 
 				// Otherwise handle the option
 				if selectedOption.Callback != nil {
+					fmt.Println("Index we are looking for:")
 					message, err := selectedOption.Callback()
 					fmt.Println("\n\n\n", message, "\n\n\n", err)
 				}
@@ -157,7 +215,19 @@ func (s *SearchInteraction) Render() {
 	p := s.getCurrentPrompt()
 
 	// Render Title
-	fmt.Printf("\r%s\n%s\n", goterm.Color(goterm.Bold(p.Title), goterm.CYAN), goterm.Color(p.Description, goterm.MAGENTA))
+	if s.CurrentIdx == 0 {
+		var keyOptions string
+		if s.SearchSelected {
+			keyOptions = "[=] Select Results | [esc] Exit (Spaces are excluded)"
+		} else {
+			keyOptions = "[+] Select Search | [n] Next Page | [b] Last Page | [enter] Select Package | [esc] Exit"
+		}
+		fmt.Printf("\r%s\n%s\n",
+			goterm.Color(goterm.Bold("Search for a package!"), goterm.CYAN),
+			goterm.Color(keyOptions, goterm.MAGENTA))
+	} else {
+		fmt.Printf("\r%s\n%s\n", goterm.Color(goterm.Bold(p.Title), goterm.CYAN), goterm.Color(p.Description, goterm.MAGENTA))
+	}
 
 	// If we are on the base prompt 0 we render the search bar
 	if s.CurrentIdx == 0 {

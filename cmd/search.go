@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -33,7 +34,10 @@ func search(cmd *cobra.Command, args []string) {
 	}
 
 	s := interaction.NewSearchInteraction()
-	homePrompt := s.CreatePrompt("Search for a pacakge. Result will filter as you type.", "[n] Next Page | [b] Last Page | [+] Select search bar | [r] Select results | [enter] Select prompt | [esc] Exit", true)
+	homePrompt := s.CreatePrompt(
+		"Search for a pacakge. Result will filter as you type.",
+		"[n] Next Page | [b] Last Page | [+] Select search bar | [=] Select results | [enter] Select prompt | [esc] Exit",
+		true)
 
 	for _, v := range data.Entries {
 		entryOption := homePrompt.AddOption(v.Name, v.Description+" [Category: "+v.Category+"]", v)
@@ -57,7 +61,9 @@ func search(cmd *cobra.Command, args []string) {
 			var installCandidate string
 
 			if strings.Contains(v.Link, "https://") {
+				fmt.Println("befor error")
 				installCandidate = strings.Split(v.Link, "https://")[1]
+				fmt.Println("after error")
 			}
 
 			install := exec.Command(goPath, "get", installCandidate)
@@ -70,6 +76,7 @@ func search(cmd *cobra.Command, args []string) {
 		installOption.AddCallback(installFunc)
 	}
 
+	s.StoreOptionsFromPrompt(homePrompt)
 	s.Open()
 
 	// What I want

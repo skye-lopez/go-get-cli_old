@@ -221,15 +221,17 @@ func (i *Interaction) Render() {
 
 // Raw input keycodes
 var (
-	u      byte = 117
-	up     byte = 65
-	down   byte = 66
-	escape byte = 27
-	enter  byte = 13
-	n      byte = 110
-	b      byte = 98
-	search byte = 43
-	r      byte = 114
+	u         byte = 117
+	up        byte = 65
+	down      byte = 66
+	escape    byte = 27
+	enter     byte = 13
+	n         byte = 110
+	b         byte = 98
+	search    byte = 43
+	results   byte = 61
+	r         byte = 114
+	backspace byte = 127
 )
 
 func userInput() byte {
